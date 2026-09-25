@@ -1,0 +1,12 @@
+[package]
+name = "zkcash_core"
+version = "0.1.0"
+description = "Anchor-free core logic of the zkcash program (formally verified with Aeneas)"
+edition = "2021"
+
+[features]
+# Enabled by the on-chain program only; never enabled for Charon/Aeneas extraction.
+bytemuck = ["dep:bytemuck"]
+
+[dependencies]
+bytemuck = { version = "1.20.0", features = ["derive", "min_const_generics"], optional = true }

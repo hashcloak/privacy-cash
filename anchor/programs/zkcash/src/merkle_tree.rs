@@ -77,30 +77,6 @@ impl MerkleTree {
     }
 
     pub fn is_known_root(tree_account: &MerkleTreeAccount, root: [u8; 32]) -> bool {
-        if root == [0u8; 32] {
-            return false;
-        }
-        
-        let root_history_size = tree_account.root_history_size as usize;
-        let current_root_index = tree_account.root_index as usize;
-        let mut i = current_root_index;
-        
-        loop {
-            if root == tree_account.root_history[i] {
-                return true;
-            }
-            
-            if i == 0 {
-                i = root_history_size - 1;
-            } else {
-                i -= 1;
-            }
-            
-            if i == current_root_index {
-                break;
-            }
-        }
-        
-        false
+        zkcash_core::merkle_tree::is_known_root(tree_account.as_core(), root)
     }
 } 

@@ -3385,4 +3385,12 @@ dependencies = [
  "rand 0.9.1",
  "solana-bn254",
  "thiserror 1.0.69",
+ "zkcash_core",
+]
+
+[[package]]
+name = "zkcash_core"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
 ]

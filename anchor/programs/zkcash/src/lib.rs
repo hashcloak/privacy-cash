@@ -911,6 +911,37 @@ pub struct MerkleTreeAccount {
     pub _padding: [u8; 5],
 }
 
+impl MerkleTreeAccount {
+    /// Zero-cost view of this account as the verified `zkcash_core` type.
+    pub fn as_core(&self) -> &zkcash_core::merkle_tree::MerkleTreeAccount {
+        bytemuck::cast_ref(self)
+    }
+
+    pub fn as_core_mut(&mut self) -> &mut zkcash_core::merkle_tree::MerkleTreeAccount {
+        bytemuck::cast_mut(self)
+    }
+}
+
+// The two definitions must have identical layout for the casts above to be sound
+// (bytemuck checks size and alignment; these check every field offset).
+const _: () = {
+    use core::mem::{align_of, offset_of, size_of};
+    use zkcash_core::merkle_tree::MerkleTreeAccount as Core;
+    assert!(size_of::<MerkleTreeAccount>() == size_of::<Core>());
+    assert!(align_of::<MerkleTreeAccount>() == align_of::<Core>());
+    assert!(offset_of!(MerkleTreeAccount, authority) == offset_of!(Core, authority));
+    assert!(offset_of!(MerkleTreeAccount, next_index) == offset_of!(Core, next_index));
+    assert!(offset_of!(MerkleTreeAccount, subtrees) == offset_of!(Core, subtrees));
+    assert!(offset_of!(MerkleTreeAccount, root) == offset_of!(Core, root));
+    assert!(offset_of!(MerkleTreeAccount, root_history) == offset_of!(Core, root_history));
+    assert!(offset_of!(MerkleTreeAccount, root_index) == offset_of!(Core, root_index));
+    assert!(offset_of!(MerkleTreeAccount, max_deposit_amount) == offset_of!(Core, max_deposit_amount));
+    assert!(offset_of!(MerkleTreeAccount, height) == offset_of!(Core, height));
+    assert!(offset_of!(MerkleTreeAccount, root_history_size) == offset_of!(Core, root_history_size));
+    assert!(offset_of!(MerkleTreeAccount, bump) == offset_of!(Core, bump));
+    assert!(offset_of!(MerkleTreeAccount, _padding) == offset_of!(Core, _padding));
+};
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Not authorized to perform this action")]
