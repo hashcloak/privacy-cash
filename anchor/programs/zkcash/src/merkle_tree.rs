@@ -1,82 +1,41 @@
 // Adapted from https://github.com/Lightprotocol/light-protocol/blob/b2a236409bb7797615d217fbf4fff498c852d25e/sparse-merkle-tree/src/merkle_tree.rs
+use core::marker::PhantomData;
 use light_hasher::Hasher;
+use zkcash_core::merkle_tree::ZERO_BYTES_LEN;
 use crate::{MerkleTreeAccount, ErrorCode};
 use anchor_lang::prelude::*;
 
 pub struct MerkleTree;
 
+/// Implements the core crate's `Hasher` with a `light_hasher` hasher
+/// (Poseidon: the `sol_poseidon` syscall on-chain).
+struct LightHasher<H>(PhantomData<H>);
+
+impl<H: Hasher> zkcash_core::merkle_tree::Hasher for LightHasher<H> {
+    fn hash_pair(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
+        H::hashv(&[left.as_slice(), right.as_slice()]).unwrap()
+    }
+
+    fn zero_bytes() -> [[u8; 32]; ZERO_BYTES_LEN] {
+        H::zero_bytes()
+    }
+}
+
 impl MerkleTree {
     pub fn initialize<H: Hasher>(tree_account: &mut MerkleTreeAccount) -> Result<()> {
-        let height = tree_account.height as usize;
-        
-        // Initialize empty subtrees
-        let zero_bytes = H::zero_bytes();
-        for i in 0..height {
-            tree_account.subtrees[i] = zero_bytes[i];
-        }
-
-        // Set initial root
-        let initial_root = H::zero_bytes()[height];
-        tree_account.root = initial_root;
-        tree_account.root_history[0] = initial_root;
-        
-        Ok(())
+        zkcash_core::merkle_tree::initialize::<LightHasher<H>>(tree_account.as_core_mut())
+            .map_err(|e| ErrorCode::from(e).into())
     }
 
     pub fn append<H: Hasher>(
         leaf: [u8; 32],
         tree_account: &mut MerkleTreeAccount,
     ) -> Result<Vec<[u8; 32]>> {
-        let height = tree_account.height as usize;
-        let root_history_size = tree_account.root_history_size as usize;
-        
-        // Check if tree is full before appending
-        // Maximum capacity is 2^height leaves
-        let max_capacity = 1u64 << height; // 2^height
-        require!(
-            tree_account.next_index < max_capacity,
-            ErrorCode::MerkleTreeFull
-        );
-
-        let mut current_index = tree_account.next_index as usize;
-        let mut current_level_hash = leaf;
-        let mut left;
-        let mut right;
-        let mut proof: Vec<[u8; 32]> = vec![[0u8; 32]; height];
-
-        for i in 0..height {
-            let subtree = &mut tree_account.subtrees[i];
-            let zero_byte = H::zero_bytes()[i];
-            
-            if current_index % 2 == 0 {
-                left = current_level_hash;
-                right = zero_byte;
-                *subtree = current_level_hash;
-                proof[i] = right;
-            } else {
-                left = *subtree;
-                right = current_level_hash;
-                proof[i] = left;
-            }
-            current_level_hash = H::hashv(&[&left, &right]).unwrap();
-            current_index /= 2;
-        }
-        
-        tree_account.root = current_level_hash;
-        tree_account.next_index = tree_account.next_index
-            .checked_add(1)
-            .ok_or(ErrorCode::ArithmeticOverflow)?;
-        
-        let new_root_index = (tree_account.root_index as usize)
-            .checked_add(1)
-            .ok_or(ErrorCode::ArithmeticOverflow)? % root_history_size;
-        tree_account.root_index = new_root_index as u64;
-        tree_account.root_history[new_root_index] = current_level_hash;
-        
-        Ok(proof)
+        zkcash_core::merkle_tree::append::<LightHasher<H>>(leaf, tree_account.as_core_mut())
+            .map_err(|e| ErrorCode::from(e).into())
     }
 
     pub fn is_known_root(tree_account: &MerkleTreeAccount, root: [u8; 32]) -> bool {
         zkcash_core::merkle_tree::is_known_root(tree_account.as_core(), root)
     }
-} 
+}

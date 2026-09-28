@@ -4,6 +4,7 @@
 //! formally verified, so it must stay free of Anchor, Solana syscalls and
 //! features Aeneas does not support (interior mutability, raw pointers, `dyn`).
 #![no_std]
+extern crate alloc;
 
 pub mod error;
 pub mod merkle_tree;

@@ -5,6 +5,7 @@
 //! Every `upstream` function is copied verbatim from privacy-cash `main`
 //! and must never be edited: it is the frozen reference behavior.
 
+mod merkle_tree;
 mod validate_fee;
 
 use anchor_lang::error::Error;
