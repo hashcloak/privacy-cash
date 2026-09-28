@@ -236,32 +236,28 @@ pub fn calculate_complete_ext_data_hash(
     fee_recipient: Pubkey,
     mint_address: Pubkey,
 ) -> Result<[u8; 32]> {
-    #[derive(AnchorSerialize)]
-    struct CompleteExtData {
-        pub recipient: Pubkey,
-        pub ext_amount: i64,
-        pub encrypted_output1: Vec<u8>,
-        pub encrypted_output2: Vec<u8>,
-        pub fee: u64,
-        pub fee_recipient: Pubkey,
-        pub mint_address: Pubkey,
-    }
-    
-    let complete_ext_data = CompleteExtData {
-        recipient,
+    zkcash_core::ext_data::calculate_complete_ext_data_hash::<SolanaSha256>(
+        recipient.to_bytes(),
         ext_amount,
-        encrypted_output1: encrypted_output1.to_vec(),
-        encrypted_output2: encrypted_output2.to_vec(),
+        encrypted_output1,
+        encrypted_output2,
         fee,
-        fee_recipient,
-        mint_address
-    };
-    
-    let mut serialized_ext_data = Vec::new();
-    complete_ext_data.serialize(&mut serialized_ext_data)?;
-    let calculated_ext_data_hash = hash(&serialized_ext_data).to_bytes();
-    
-    Ok(calculated_ext_data_hash)
+        fee_recipient.to_bytes(),
+        mint_address.to_bytes(),
+    )
+    // Upstream's Borsh `serialize(..)?` fails only for an encrypted output
+    // longer than u32::MAX bytes, with a Borsh I/O error.
+    .ok_or_else(|| Error::from(ProgramError::BorshIoError("Overflow".to_string())))
+}
+
+/// Implements the core crate's `Sha256` with `solana_program::hash::hash`
+/// (the `sol_sha256` syscall on-chain).
+pub struct SolanaSha256;
+
+impl zkcash_core::ext_data::Sha256 for SolanaSha256 {
+    fn hash(data: &[u8]) -> [u8; 32] {
+        hash(data).to_bytes()
+    }
 }
 
 pub fn change_endianness(bytes: &[u8]) -> Vec<u8> {

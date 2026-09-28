@@ -6,6 +6,7 @@
 //! and must never be edited: it is the frozen reference behavior.
 
 mod byte_helpers;
+mod ext_data;
 mod check_public_amount;
 mod merkle_tree;
 mod validate_fee;
