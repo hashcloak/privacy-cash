@@ -92,39 +92,42 @@ pub const VERIFYING_KEY: Groth16Verifyingkey =  Groth16Verifyingkey {
 pub fn check_public_amount(ext_amount: i64, fee: u64, public_amount_bytes: [u8; 32]) -> bool {
     if ext_amount == i64::MIN {
         msg!("can't use i64::MIN as ext_amount"); 
-        return false;
+    }
+    zkcash_core::utils::check_public_amount::<ArkFr>(ext_amount, fee, public_amount_bytes)
+}
+
+/// Implements the core crate's `PrimeField` with arkworks' BN254 scalar field.
+#[derive(Clone, Copy)]
+pub struct ArkFr(pub Fr);
+
+impl zkcash_core::field::PrimeField for ArkFr {
+    fn from_u64(x: u64) -> Self {
+        ArkFr(Fr::from(x))
     }
 
-    // Convert to field elements for proper BN254 arithmetic
-    let fee_fr = Fr::from(fee);
-    let ext_amount_fr = if ext_amount >= 0 {
-        Fr::from(ext_amount as u64)
-    } else {
-        let abs_ext_amount = match ext_amount.checked_neg() {
-            Some(val) => val,
-            None => return false,
-        };
-        Fr::from(abs_ext_amount as u64)
-    };
-
-    // return false if the deposit amount is barely enough to cover the fee
-    if ext_amount >= 0 && ext_amount_fr <= fee_fr {
-        return false;
+    fn from_be_bytes_mod_order(bytes: &[u8; 32]) -> Self {
+        ArkFr(Fr::from_be_bytes_mod_order(bytes))
     }
 
-    let result_public_amount = if ext_amount >= 0 {
-        // For positive amounts: public_amount = ext_amount - fee
-        ext_amount_fr - fee_fr
-    } else {
-        // For negative amounts: public_amount = -abs(ext_amount) - fee
-        // In field arithmetic, this becomes: FIELD_SIZE - (abs(ext_amount) + fee)
-        -(ext_amount_fr + fee_fr)
-    };
+    fn add(a: Self, b: Self) -> Self {
+        ArkFr(a.0 + b.0)
+    }
 
-    // Convert provided bytes to field element for comparison
-    let provided_amount = Fr::from_be_bytes_mod_order(&public_amount_bytes);
-    
-    result_public_amount == provided_amount
+    fn sub(a: Self, b: Self) -> Self {
+        ArkFr(a.0 - b.0)
+    }
+
+    fn neg(a: Self) -> Self {
+        ArkFr(-a.0)
+    }
+
+    fn le(a: Self, b: Self) -> bool {
+        a.0 <= b.0
+    }
+
+    fn eq(a: Self, b: Self) -> bool {
+        a.0 == b.0
+    }
 }
 
 /**

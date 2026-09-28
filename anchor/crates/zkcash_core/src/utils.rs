@@ -1,4 +1,5 @@
 use crate::error::{ErrorCode, Result};
+use crate::field::PrimeField;
 
 /// Mirrors `utils::validate_fee`.
 pub fn validate_fee(
@@ -63,4 +64,47 @@ pub fn validate_fee(
     // For ext_amount == 0, no fee validation needed
     
     Ok(())
+}
+
+/// Mirrors `utils::check_public_amount`. The upstream `msg!` log for
+/// `i64::MIN` stays in the program wrapper (logging is a syscall).
+pub fn check_public_amount<F: PrimeField>(
+    ext_amount: i64,
+    fee: u64,
+    public_amount_bytes: [u8; 32],
+) -> bool {
+    if ext_amount == i64::MIN {
+        return false;
+    }
+
+    // Convert to field elements for proper BN254 arithmetic
+    let fee_fr = F::from_u64(fee);
+    let ext_amount_fr = if ext_amount >= 0 {
+        F::from_u64(ext_amount as u64)
+    } else {
+        let abs_ext_amount = match ext_amount.checked_neg() {
+            Some(val) => val,
+            None => return false,
+        };
+        F::from_u64(abs_ext_amount as u64)
+    };
+
+    // return false if the deposit amount is barely enough to cover the fee
+    if ext_amount >= 0 && F::le(ext_amount_fr, fee_fr) {
+        return false;
+    }
+
+    let result_public_amount = if ext_amount >= 0 {
+        // For positive amounts: public_amount = ext_amount - fee
+        F::sub(ext_amount_fr, fee_fr)
+    } else {
+        // For negative amounts: public_amount = -abs(ext_amount) - fee
+        // In field arithmetic, this becomes: FIELD_SIZE - (abs(ext_amount) + fee)
+        F::neg(F::add(ext_amount_fr, fee_fr))
+    };
+
+    // Convert provided bytes to field element for comparison
+    let provided_amount = F::from_be_bytes_mod_order(&public_amount_bytes);
+    
+    F::eq(result_public_amount, provided_amount)
 }
