@@ -1,5 +1,6 @@
 use crate::error::{ErrorCode, Result};
 use crate::field::PrimeField;
+use alloc::vec::Vec;
 
 /// Mirrors `utils::validate_fee`.
 pub fn validate_fee(
@@ -107,4 +108,48 @@ pub fn check_public_amount<F: PrimeField>(
     let provided_amount = F::from_be_bytes_mod_order(&public_amount_bytes);
     
     F::eq(result_public_amount, provided_amount)
+}
+
+/// Mirrors `utils::change_endianness`: reverses the bytes of every 32-byte
+/// chunk (the last chunk may be shorter).
+///
+/// Upstream uses `bytes.chunks(32)` and `.iter().rev()`; Aeneas has no model of
+/// those iterators, so this walks the same chunks with indices. Equivalence is
+/// checked by the differential tests.
+pub fn change_endianness(bytes: &[u8]) -> Vec<u8> {
+    let mut vec = Vec::new();
+    let mut start = 0;
+    while start < bytes.len() {
+        let end = if bytes.len() - start < 32 { bytes.len() } else { start + 32 };
+        let mut i = end;
+        while i > start {
+            i -= 1;
+            vec.push(bytes[i]);
+        }
+        start = end;
+    }
+    vec
+}
+
+/// BN254 scalar field modulus p (`ark_bn254::Fr::MODULUS`), big-endian.
+pub const BN254_FR_MODULUS_BE: [u8; 32] = [
+    0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d,
+    0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
+];
+
+/// Mirrors `groth16::is_less_than_bn254_field_size_be`: is the big-endian
+/// number `bytes` below p?
+///
+/// Upstream converts both sides to `BigUint` and compares; for two 32-byte
+/// big-endian numbers that is the same as comparing byte by byte from the
+/// most significant end, which is what this does.
+pub fn is_less_than_bn254_field_size_be(bytes: &[u8; 32]) -> bool {
+    let mut i = 0;
+    while i < 32 {
+        if bytes[i] != BN254_FR_MODULUS_BE[i] {
+            return bytes[i] < BN254_FR_MODULUS_BE[i];
+        }
+        i += 1;
+    }
+    false
 }
