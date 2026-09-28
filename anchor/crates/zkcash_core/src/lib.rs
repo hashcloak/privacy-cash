@@ -6,6 +6,7 @@
 #![no_std]
 extern crate alloc;
 
+pub mod admin;
 pub mod error;
 pub mod ext_data;
 pub mod field;

@@ -9,7 +9,7 @@ pub struct MerkleTree;
 
 /// Implements the core crate's `Hasher` with a `light_hasher` hasher
 /// (Poseidon: the `sol_poseidon` syscall on-chain).
-struct LightHasher<H>(PhantomData<H>);
+pub struct LightHasher<H>(PhantomData<H>);
 
 impl<H: Hasher> zkcash_core::merkle_tree::Hasher for LightHasher<H> {
     fn hash_pair(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {

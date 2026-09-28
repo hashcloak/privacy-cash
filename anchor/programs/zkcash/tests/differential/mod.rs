@@ -5,6 +5,7 @@
 //! Every `upstream` function is copied verbatim from privacy-cash `main`
 //! and must never be edited: it is the frozen reference behavior.
 
+mod admin;
 mod byte_helpers;
 mod ext_data;
 mod check_public_amount;

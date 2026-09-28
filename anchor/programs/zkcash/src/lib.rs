@@ -12,6 +12,7 @@ declare_id!("ATZj4jZ4FFzkvAcvk27DW9GRkgSbFnHo49fKKPQXU7VS");
 #[cfg(not(any(feature = "devnet", feature = "localnet", feature = "localnet-mint-checked")))]
 declare_id!("9fhQBbumKEFuXtMBDw8AaQyAjCorLGJQiS3skWZdQyQD");
 
+pub mod admin;
 pub mod merkle_tree;
 pub mod utils;
 pub mod groth16;
@@ -21,6 +22,7 @@ use merkle_tree::MerkleTree;
 
 // Constants
 const MERKLE_TREE_HEIGHT: u8 = 26;
+const _: () = assert!(MERKLE_TREE_HEIGHT == zkcash_core::admin::MERKLE_TREE_HEIGHT);
 
 #[cfg(any(feature = "localnet", feature = "localnet-mint-checked", test))]
 pub const ADMIN_PUBKEY: Option<Pubkey> = None;
@@ -68,32 +70,19 @@ pub mod zkcash {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        if let Some(admin_key) = ADMIN_PUBKEY {
-            require!(ctx.accounts.authority.key().eq(&admin_key), ErrorCode::Unauthorized);
-        }
+        admin::check_admin(&ctx.accounts.authority.key(), ADMIN_PUBKEY)?;
         
         let tree_account = &mut ctx.accounts.tree_account.load_init()?;
-        tree_account.authority = ctx.accounts.authority.key();
-        tree_account.next_index = 0;
-        tree_account.root_index = 0;
-        tree_account.bump = ctx.bumps.tree_account;
-        tree_account.max_deposit_amount = 1_000_000_000_000; // 1000 SOL default limit
-        tree_account.height = MERKLE_TREE_HEIGHT; // Hardcoded height
-        tree_account.root_history_size = 100; // Hardcoded root history size
-
-        MerkleTree::initialize::<Poseidon>(tree_account)?;
-        
-        let token_account = &mut ctx.accounts.tree_token_account;
-        token_account.authority = ctx.accounts.authority.key();
-        token_account.bump = ctx.bumps.tree_token_account;
-        
-        // Initialize global config
-        let global_config = &mut ctx.accounts.global_config;
-        global_config.authority = ctx.accounts.authority.key();
-        global_config.deposit_fee_rate = 0; // 0% - Free deposits
-        global_config.withdrawal_fee_rate = 25; // 0.25% (25 basis points)
-        global_config.fee_error_margin = 500; // 5% (500 basis points)
-        global_config.bump = ctx.bumps.global_config;
+        admin::initialize(
+            tree_account,
+            &mut ctx.accounts.tree_token_account,
+            &mut ctx.accounts.global_config,
+            &ctx.accounts.authority.key(),
+            ctx.bumps.tree_account,
+            ctx.bumps.tree_token_account,
+            ctx.bumps.global_config,
+        )?;
+        let global_config = &ctx.accounts.global_config;
         
         msg!("Sparse Merkle Tree initialized successfully with height: {}, root history size: {}, deposit limit: {} lamports, 
             deposit fee rate: {}, withdrawal fee rate: {}, fee error margin: {}",
@@ -107,7 +96,7 @@ pub mod zkcash {
     pub fn update_deposit_limit(ctx: Context<UpdateDepositLimit>, new_limit: u64) -> Result<()> {
         let tree_account = &mut ctx.accounts.tree_account.load_mut()?;
         
-        tree_account.max_deposit_amount = new_limit;
+        admin::update_deposit_limit(tree_account, new_limit);
         
         msg!("Deposit limit updated to: {} lamports", new_limit);
         Ok(())
@@ -122,23 +111,22 @@ pub mod zkcash {
         withdrawal_fee_rate: Option<u16>,
         fee_error_margin: Option<u16>
     ) -> Result<()> {
-        let global_config = &mut ctx.accounts.global_config;
+        admin::update_global_config(
+            &mut ctx.accounts.global_config,
+            deposit_fee_rate,
+            withdrawal_fee_rate,
+            fee_error_margin,
+        )?;
         
         if let Some(deposit_rate) = deposit_fee_rate {
-            require!(deposit_rate <= 10000, ErrorCode::InvalidFeeRate);
-            global_config.deposit_fee_rate = deposit_rate;
             msg!("Deposit fee rate updated to: {} basis points", deposit_rate);
         }
         
         if let Some(withdrawal_rate) = withdrawal_fee_rate {
-            require!(withdrawal_rate <= 10000, ErrorCode::InvalidFeeRate);
-            global_config.withdrawal_fee_rate = withdrawal_rate;
             msg!("Withdrawal fee rate updated to: {} basis points", withdrawal_rate);
         }
         
         if let Some(fee_error_margin_val) = fee_error_margin {
-            require!(fee_error_margin_val <= 10000, ErrorCode::InvalidFeeRate);
-            global_config.fee_error_margin = fee_error_margin_val;
             msg!("Fee error margin updated to: {} basis points", fee_error_margin_val);
         }
         
@@ -154,26 +142,18 @@ pub mod zkcash {
         ctx: Context<InitializeTreeAccountForSplToken>,
         max_deposit_amount: u64
     ) -> Result<()> {
-        if let Some(admin_key) = ADMIN_PUBKEY {
-            require!(ctx.accounts.authority.key().eq(&admin_key), ErrorCode::Unauthorized);
-        }
+        admin::check_admin(&ctx.accounts.authority.key(), ADMIN_PUBKEY)?;
         
         // Validate that the mint is in the allowed tokens list
-        require!(
-            ALLOW_ALL_SPL_TOKENS || ALLOWED_TOKENS.contains(&ctx.accounts.mint.key()),
-            ErrorCode::InvalidMintAddress
-        );
+        admin::check_allowed_mint(&ctx.accounts.mint.key(), ALLOW_ALL_SPL_TOKENS, ALLOWED_TOKENS)?;
         
         let tree_account = &mut ctx.accounts.tree_account.load_init()?;
-        tree_account.authority = ctx.accounts.authority.key();
-        tree_account.next_index = 0;
-        tree_account.root_index = 0;
-        tree_account.bump = ctx.bumps.tree_account;
-        tree_account.max_deposit_amount = max_deposit_amount;
-        tree_account.height = MERKLE_TREE_HEIGHT;
-        tree_account.root_history_size = 100;
-
-        MerkleTree::initialize::<Poseidon>(tree_account)?;
+        admin::initialize_tree_account_for_spl_token(
+            tree_account,
+            &ctx.accounts.authority.key(),
+            ctx.bumps.tree_account,
+            max_deposit_amount,
+        )?;
         
         msg!(
             "SPL Token merkle tree initialized for mint: {}, height: {}, root history size: {}, deposit limit: {}",
@@ -196,7 +176,7 @@ pub mod zkcash {
     ) -> Result<()> {
         let tree_account = &mut ctx.accounts.tree_account.load_mut()?;
         
-        tree_account.max_deposit_amount = new_limit;
+        admin::update_deposit_limit(tree_account, new_limit);
         
         msg!(
             "Deposit limit updated to: {} for mint: {}",
