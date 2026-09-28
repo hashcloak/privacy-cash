@@ -5,4 +5,6 @@
 //! features Aeneas does not support (interior mutability, raw pointers, `dyn`).
 #![no_std]
 
+pub mod error;
 pub mod merkle_tree;
+pub mod utils;

@@ -3521,6 +3521,7 @@ dependencies = [
  "light-hasher",
  "light-poseidon 0.4.0",
  "num-bigint",
+ "proptest",
  "rand 0.9.1",
  "solana-bn254",
  "thiserror 1.0.69",

@@ -911,6 +911,35 @@ pub struct MerkleTreeAccount {
     pub _padding: [u8; 5],
 }
 
+impl From<zkcash_core::error::ErrorCode> for ErrorCode {
+    fn from(e: zkcash_core::error::ErrorCode) -> Self {
+        use zkcash_core::error::ErrorCode as Core;
+        // Exhaustive by name: adding a variant on either side breaks the build.
+        match e {
+            Core::Unauthorized => ErrorCode::Unauthorized,
+            Core::ExtDataHashMismatch => ErrorCode::ExtDataHashMismatch,
+            Core::UnknownRoot => ErrorCode::UnknownRoot,
+            Core::InvalidPublicAmountData => ErrorCode::InvalidPublicAmountData,
+            Core::InsufficientFundsForWithdrawal => ErrorCode::InsufficientFundsForWithdrawal,
+            Core::InsufficientFundsForFee => ErrorCode::InsufficientFundsForFee,
+            Core::InvalidProof => ErrorCode::InvalidProof,
+            Core::InvalidFee => ErrorCode::InvalidFee,
+            Core::InvalidExtAmount => ErrorCode::InvalidExtAmount,
+            Core::PublicAmountCalculationError => ErrorCode::PublicAmountCalculationError,
+            Core::ArithmeticOverflow => ErrorCode::ArithmeticOverflow,
+            Core::DepositLimitExceeded => ErrorCode::DepositLimitExceeded,
+            Core::InvalidFeeRate => ErrorCode::InvalidFeeRate,
+            Core::InvalidFeeRecipient => ErrorCode::InvalidFeeRecipient,
+            Core::InvalidFeeAmount => ErrorCode::InvalidFeeAmount,
+            Core::RecipientMismatch => ErrorCode::RecipientMismatch,
+            Core::MerkleTreeFull => ErrorCode::MerkleTreeFull,
+            Core::InvalidTokenAccount => ErrorCode::InvalidTokenAccount,
+            Core::InvalidMintAddress => ErrorCode::InvalidMintAddress,
+            Core::InvalidTokenAccountMintAddress => ErrorCode::InvalidTokenAccountMintAddress,
+        }
+    }
+}
+
 impl MerkleTreeAccount {
     /// Zero-cost view of this account as the verified `zkcash_core` type.
     pub fn as_core(&self) -> &zkcash_core::merkle_tree::MerkleTreeAccount {
