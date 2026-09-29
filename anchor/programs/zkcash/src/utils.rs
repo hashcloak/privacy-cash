@@ -1,5 +1,6 @@
 use crate::Proof;
-use crate::groth16::{Groth16Verifier, Groth16Verifyingkey};
+use crate::groth16::Groth16Verifyingkey;
+use solana_bn254::prelude::{alt_bn128_addition, alt_bn128_multiplication, alt_bn128_pairing};
 use crate::ErrorCode;
 use ark_bn254;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
@@ -170,59 +171,68 @@ pub fn validate_fee(
 }
 
 pub fn verify_proof(proof: Proof, verifying_key: Groth16Verifyingkey) -> bool {
-    let mut public_inputs_vec: [[u8; 32]; 7] = [[0u8; 32]; 7];
-
-    public_inputs_vec[0] = proof.root;
-    public_inputs_vec[1] = proof.public_amount;
-    public_inputs_vec[2] = proof.ext_data_hash;
-    public_inputs_vec[3] = proof.input_nullifiers[0];
-    public_inputs_vec[4] = proof.input_nullifiers[1];
-    public_inputs_vec[5] = proof.output_commitments[0];
-    public_inputs_vec[6] = proof.output_commitments[1];
-
-     // First deserialize PROOF_A into a G1 point
-     let g1_point = match G1::deserialize_with_mode(
-        &*[&change_endianness(&proof.proof_a[0..64]), &[0u8][..]].concat(),
-        Compress::No,
-        Validate::Yes,
-    ) {
-        Ok(point) => point,
+    // Upstream's `Groth16Verifier::new` rejects a key whose `vk_ic` does not
+    // have one entry per public input plus one.
+    let vk_ic = match verifying_key.vk_ic.try_into() {
+        Ok(vk_ic) => vk_ic,
         Err(_) => return false,
     };
-    
-    let mut proof_a_neg = [0u8; 65];
-    if g1_point
-        .neg()
-        .x
-        .serialize_with_mode(&mut proof_a_neg[..32], Compress::No)
-        .is_err() {
-        return false;
-    }
-    if g1_point
-        .neg()
-        .y
-        .serialize_with_mode(&mut proof_a_neg[32..], Compress::No)
-        .is_err() {
-        return false;
+    let verifying_key = zkcash_core::groth16::VerifyingKey {
+        vk_alpha_g1: verifying_key.vk_alpha_g1,
+        vk_beta_g2: verifying_key.vk_beta_g2,
+        vk_gamme_g2: verifying_key.vk_gamme_g2,
+        vk_delta_g2: verifying_key.vk_delta_g2,
+        vk_ic,
+    };
+    zkcash_core::groth16::verify_proof::<SolanaBn254>(&proof.to_core(), &verifying_key)
+}
+
+/// Implements the core crate's `Bn254` with the `alt_bn128` syscalls and, for
+/// negating proof_a, arkworks (each body is the code upstream used).
+pub struct SolanaBn254;
+
+impl zkcash_core::groth16::Bn254 for SolanaBn254 {
+    fn g1_mul(point: &[u8; 64], scalar: &[u8; 32]) -> Option<[u8; 64]> {
+        alt_bn128_multiplication(&[&point[..], &scalar[..]].concat()).ok()?.try_into().ok()
     }
 
-    let proof_a: [u8; 64] = match change_endianness(&proof_a_neg[..64]).try_into() {
-        Ok(array) => array,
-        Err(_) => return false,
-    };
+    fn g1_add(a: &[u8; 64], b: &[u8; 64]) -> Option<[u8; 64]> {
+        alt_bn128_addition(&[&a[..], &b[..]].concat()).ok()?.try_into().ok()
+    }
 
-    let mut verifier = match Groth16Verifier::new(
-        &proof_a,
-        &proof.proof_b,
-        &proof.proof_c,
-        &public_inputs_vec,
-        &verifying_key
-    ) {
-        Ok(v) => v,
-        Err(_) => return false,
-    };
+    fn pairing(input: &[u8; 768]) -> Option<[u8; 32]> {
+        alt_bn128_pairing(input.as_slice()).ok()?.try_into().ok()
+    }
 
-    verifier.verify().unwrap_or(false)
+    fn negate_g1(proof_a: &[u8; 64]) -> Option<[u8; 64]> {
+        // First deserialize PROOF_A into a G1 point
+        let g1_point = match G1::deserialize_with_mode(
+            &*[&change_endianness(&proof_a[0..64]), &[0u8][..]].concat(),
+            Compress::No,
+            Validate::Yes,
+        ) {
+            Ok(point) => point,
+            Err(_) => return None,
+        };
+
+        let mut proof_a_neg = [0u8; 65];
+        if g1_point
+            .neg()
+            .x
+            .serialize_with_mode(&mut proof_a_neg[..32], Compress::No)
+            .is_err() {
+            return None;
+        }
+        if g1_point
+            .neg()
+            .y
+            .serialize_with_mode(&mut proof_a_neg[32..], Compress::No)
+            .is_err() {
+            return None;
+        }
+
+        change_endianness(&proof_a_neg[..64]).try_into().ok()
+    }
 }
 
 /**

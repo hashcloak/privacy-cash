@@ -8,6 +8,7 @@
 mod admin;
 mod byte_helpers;
 mod ext_data;
+mod groth16;
 mod transact;
 mod check_public_amount;
 mod merkle_tree;

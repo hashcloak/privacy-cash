@@ -10,6 +10,7 @@ pub mod admin;
 pub mod error;
 pub mod ext_data;
 pub mod field;
+pub mod groth16;
 pub mod merkle_tree;
 pub mod transact;
 pub mod utils;
