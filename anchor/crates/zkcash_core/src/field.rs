@@ -7,6 +7,8 @@ pub trait PrimeField: Copy {
     fn from_u64(x: u64) -> Self;
     /// Big-endian bytes reduced mod p, like `Fr::from_be_bytes_mod_order`.
     fn from_be_bytes_mod_order(bytes: &[u8; 32]) -> Self;
+    /// Little-endian bytes reduced mod p, like `Fr::from_le_bytes_mod_order`.
+    fn from_le_bytes_mod_order(bytes: &[u8; 32]) -> Self;
     fn add(a: Self, b: Self) -> Self;
     fn sub(a: Self, b: Self) -> Self;
     fn neg(a: Self) -> Self;

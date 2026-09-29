@@ -14,6 +14,7 @@ declare_id!("9fhQBbumKEFuXtMBDw8AaQyAjCorLGJQiS3skWZdQyQD");
 
 pub mod admin;
 pub mod merkle_tree;
+pub mod runtime;
 pub mod utils;
 pub mod groth16;
 pub mod errors;
@@ -199,136 +200,36 @@ pub mod zkcash {
         // Reconstruct full ExtData from minified version and context accounts
         let ext_data = ExtData::from_minified(&ctx, ext_data_minified);
 
-        // check if proof.root is in the tree_account's proof history
-        require!(
-            MerkleTree::is_known_root(&tree_account, proof.root),
-            ErrorCode::UnknownRoot
+        let mut runtime = runtime::SolTransactRuntime::new(
+            ctx.accounts.signer.to_account_info(),
+            ctx.accounts.tree_token_account.to_account_info(),
+            ctx.accounts.recipient.to_account_info(),
+            ctx.accounts.fee_recipient_account.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
         );
-
-        // check if the ext_data hashes to the same ext_data in the proof
-        let calculated_ext_data_hash = utils::calculate_complete_ext_data_hash(
-            ext_data.recipient,
+        let appended = match zkcash_core::transact::transact::<
+            merkle_tree::LightHasher<Poseidon>,
+            utils::ArkFr,
+            utils::SolanaSha256,
+            runtime::ProgramVerifier,
+            _,
+        >(
+            &mut runtime,
+            tree_account.as_core_mut(),
+            &global_config.to_core(),
+            &proof.to_core(),
             ext_data.ext_amount,
+            ext_data.fee,
+            ext_data.recipient.to_bytes(),
+            ext_data.fee_recipient.to_bytes(),
             &encrypted_output1,
             &encrypted_output2,
-            ext_data.fee,
-            ext_data.fee_recipient,
-            ext_data.mint_address,
-        )?;
-
-        require!(
-            Fr::from_le_bytes_mod_order(&calculated_ext_data_hash) == Fr::from_be_bytes_mod_order(&proof.ext_data_hash),
-            ErrorCode::ExtDataHashMismatch
-        );
-
-        require!(
-            utils::check_public_amount(ext_data.ext_amount, ext_data.fee, proof.public_amount),
-            ErrorCode::InvalidPublicAmountData
-        );
-        
-        let ext_amount = ext_data.ext_amount;
-        let fee = ext_data.fee;
-
-        // Validate fee calculation using utility function
-        utils::validate_fee(
-            ext_amount,
-            fee,
-            global_config.deposit_fee_rate,
-            global_config.withdrawal_fee_rate,
-            global_config.fee_error_margin,
-        )?;
-
-        // verify the proof
-        require!(verify_proof(proof.clone(), VERIFYING_KEY), ErrorCode::InvalidProof);
-
-        let tree_token_account_info = ctx.accounts.tree_token_account.to_account_info();
-        let rent = Rent::get()?;
-        let rent_exempt_minimum = rent.minimum_balance(tree_token_account_info.data_len());
-
-        if ext_amount > 0 {
-            // Check deposit limit for deposits
-            let deposit_amount = ext_amount as u64;
-            require!(
-                deposit_amount <= tree_account.max_deposit_amount,
-                ErrorCode::DepositLimitExceeded
-            );
-            
-            // If it's a deposit, transfer the SOL to the tree token account.
-            anchor_lang::system_program::transfer(
-                CpiContext::new(
-                    ctx.accounts.system_program.to_account_info(),
-                    anchor_lang::system_program::Transfer {
-                        from: ctx.accounts.signer.to_account_info(),
-                        to: ctx.accounts.tree_token_account.to_account_info(),
-                    },
-                ),
-                ext_amount as u64,
-            )?;
-        } else if ext_amount < 0 {
-            // PDA can't directly sign transactions, so we need to transfer SOL via try_borrow_mut_lamports
-            // No limit on withdrawals
-            let recipient_account_info = ctx.accounts.recipient.to_account_info();
-
-            let ext_amount_abs: u64 = ext_amount.checked_neg()
-                .ok_or(ErrorCode::ArithmeticOverflow)?
-                .try_into()
-                .map_err(|_| ErrorCode::InvalidExtAmount)?;
-            
-            let total_required = ext_amount_abs
-                .checked_add(fee)
-                .ok_or(ErrorCode::ArithmeticOverflow)?
-                .checked_add(rent_exempt_minimum)
-                .ok_or(ErrorCode::ArithmeticOverflow)?;
-            
-            require!(
-                tree_token_account_info.lamports() >= total_required,
-                ErrorCode::InsufficientFundsForWithdrawal
-            );
-
-            let tree_token_balance = tree_token_account_info.lamports();
-            let recipient_balance = recipient_account_info.lamports();
-            
-            let new_tree_token_balance = tree_token_balance.checked_sub(ext_amount_abs)
-                .ok_or(ErrorCode::ArithmeticOverflow)?;
-            let new_recipient_balance = recipient_balance.checked_add(ext_amount_abs)
-                .ok_or(ErrorCode::ArithmeticOverflow)?;
-                
-            **tree_token_account_info.try_borrow_mut_lamports()? = new_tree_token_balance;
-            **recipient_account_info.try_borrow_mut_lamports()? = new_recipient_balance;
-        }
-        
-        if fee > 0 {
-            let fee_recipient_account_info = ctx.accounts.fee_recipient_account.to_account_info();
-
-            if ext_amount >= 0 {
-                let total_required = fee
-                    .checked_add(rent_exempt_minimum)
-                    .ok_or(ErrorCode::ArithmeticOverflow)?;
-                
-                require!(
-                    tree_token_account_info.lamports() >= total_required,
-                    ErrorCode::InsufficientFundsForFee
-                );
-            }
-
-            let tree_token_balance = tree_token_account_info.lamports();
-            let fee_recipient_balance = fee_recipient_account_info.lamports();
-            
-            let new_tree_token_balance = tree_token_balance.checked_sub(fee)
-                .ok_or(ErrorCode::ArithmeticOverflow)?;
-            let new_fee_recipient_balance = fee_recipient_balance.checked_add(fee)
-                .ok_or(ErrorCode::ArithmeticOverflow)?;
-                
-            **tree_token_account_info.try_borrow_mut_lamports()? = new_tree_token_balance;
-            **fee_recipient_account_info.try_borrow_mut_lamports()? = new_fee_recipient_balance;
-        }
-
-        let next_index_to_insert = tree_account.next_index;
-        MerkleTree::append::<Poseidon>(proof.output_commitments[0], tree_account)?;
-        MerkleTree::append::<Poseidon>(proof.output_commitments[1], tree_account)?;
-
-        let second_index = next_index_to_insert.checked_add(1)
-            .ok_or(ErrorCode::ArithmeticOverflow)?;
+        ) {
+            Ok(appended) => appended,
+            Err(e) => return Err(runtime.into_error(e)),
+        };
+        let next_index_to_insert = appended.first_index;
+        let second_index = appended.second_index;
 
         emit!(CommitmentData {
             index: next_index_to_insert,

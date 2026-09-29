@@ -109,6 +109,10 @@ impl zkcash_core::field::PrimeField for ArkFr {
         ArkFr(Fr::from_be_bytes_mod_order(bytes))
     }
 
+    fn from_le_bytes_mod_order(bytes: &[u8; 32]) -> Self {
+        ArkFr(Fr::from_le_bytes_mod_order(bytes))
+    }
+
     fn add(a: Self, b: Self) -> Self {
         ArkFr(a.0 + b.0)
     }
