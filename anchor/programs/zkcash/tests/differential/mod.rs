@@ -13,6 +13,7 @@ mod transact;
 mod check_public_amount;
 mod merkle_tree;
 mod validate_fee;
+mod verifying_key;
 
 use anchor_lang::error::Error;
 

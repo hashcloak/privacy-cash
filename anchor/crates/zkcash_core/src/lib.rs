@@ -14,3 +14,4 @@ pub mod groth16;
 pub mod merkle_tree;
 pub mod transact;
 pub mod utils;
+pub mod verifying_key;
