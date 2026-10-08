@@ -1,13 +1,18 @@
 //! Test vectors for the Lean model's hand-written parts.
 //!
-//! `print_negate_g1_vectors` runs the program's real `SolanaBn254::negate_g1`
-//! (arkworks) on fixed inputs and prints them as the Lean file
-//! `formal-verification/core-model/PrivacyCash/Tests/Bn254Vectors.lean`, whose
-//! `#guard`s check that the Lean `negateG1` gives the same answers.
+//! Each `print_*` generator runs the program's real arkworks code on fixed
+//! inputs and prints them as Lean, between GENERATED markers in a file under
+//! `formal-verification/core-model/Tests/`, whose `#guard`s check that the
+//! Lean model gives the same answers:
+//! - `print_negate_g1_vectors`: `SolanaBn254::negate_g1` (`Bn254Vectors.lean`);
+//! - `print_field_vectors`: `ArkFr` (`FieldVectors.lean`).
 //! `formal-verification/core-model/scripts/check_vectors.sh` regenerates the
-//! file and fails if it changed.
+//! files and fails if they changed.
 
-use zkcash::utils::{SolanaBn254, VERIFYING_KEY};
+use ark_ff::PrimeField as _;
+use num_bigint::BigUint;
+use zkcash::utils::{ArkFr, SolanaBn254, VERIFYING_KEY};
+use zkcash_core::field::PrimeField;
 use zkcash_core::groth16::Bn254;
 
 /// Deterministic xorshift, so the vectors are the same on every run.
@@ -124,6 +129,124 @@ fn print_negate_g1_vectors() {
         };
         let sep = if i + 1 == all.len() { "" } else { "," };
         println!("  (\"{}\", {},\n    {}){}", name, lean_bytes(input), out, sep);
+    }
+    println!("]");
+    println!("-- END GENERATED");
+}
+
+/// BN254 scalar field modulus r.
+fn modulus_r() -> BigUint {
+    ark_bn254::Fr::MODULUS.into()
+}
+
+/// The canonical value in `0..r` of a field element, in decimal.
+fn fr_value(a: ArkFr) -> String {
+    let v: BigUint = a.0.into_bigint().into();
+    v.to_string()
+}
+
+/// `n` as 32 big-endian bytes (`n < 2^256`).
+fn be32(n: &BigUint) -> [u8; 32] {
+    let b = n.to_bytes_be();
+    let mut out = [0u8; 32];
+    out[32 - b.len()..].copy_from_slice(&b);
+    out
+}
+
+#[test]
+#[ignore = "generator: run with --ignored --nocapture"]
+fn print_field_vectors() {
+    let r = modulus_r();
+    let one = BigUint::from(1u8);
+    let two_256 = BigUint::from(1u8) << 256;
+    let mut rng = Xorshift(0xf1e1_d5ca_1a12_0001);
+
+    // u64 inputs.
+    let mut u64s = vec![0u64, 1, 2, u64::MAX, u64::MAX - 1];
+    for _ in 0..5 {
+        u64s.push(rng.next());
+    }
+
+    // 32-byte inputs, each read both big- and little-endian.
+    let mut bytes: Vec<[u8; 32]> = [
+        BigUint::from(0u8),
+        one.clone(),
+        &r - &one,
+        r.clone(),
+        &r + &one,
+        &r * 2u8,
+        &r * 5u8,
+        &two_256 - &one,
+        BigUint::from(1u8) << 255,
+        BigUint::from(u64::MAX),
+    ]
+    .iter()
+    .map(be32)
+    .collect();
+    for _ in 0..8 {
+        bytes.push(rng.bytes());
+    }
+
+    // Field elements for the binary operations, given by their canonical values.
+    let mut elems: Vec<BigUint> = vec![
+        BigUint::from(0u8),
+        one.clone(),
+        BigUint::from(2u8),
+        &r - &one,
+        &r - BigUint::from(2u8),
+        (&r - &one) / 2u8,
+        (&r + &one) / 2u8,
+    ];
+    for _ in 0..5 {
+        let b: [u8; 32] = rng.bytes();
+        elems.push(BigUint::from_bytes_be(&b) % &r);
+    }
+    let fr = |n: &BigUint| ArkFr::from_be_bytes_mod_order(&be32(n));
+
+    println!("-- BEGIN GENERATED");
+    println!("/-- (x, `ArkFr::from_u64(x)`) -/");
+    println!("def fromU64Vectors : List (Nat × Nat) := [");
+    for (i, x) in u64s.iter().enumerate() {
+        let sep = if i + 1 == u64s.len() { "" } else { "," };
+        println!("  ({}, {}){}", x, fr_value(ArkFr::from_u64(*x)), sep);
+    }
+    println!("]");
+    println!();
+    println!("/-- (bytes, `from_be_bytes_mod_order(bytes)`, `from_le_bytes_mod_order(bytes)`) -/");
+    println!("def fromBytesVectors : List (List Nat × Nat × Nat) := [");
+    for (i, b) in bytes.iter().enumerate() {
+        let sep = if i + 1 == bytes.len() { "" } else { "," };
+        println!(
+            "  ({}, {}, {}){}",
+            lean_bytes(b),
+            fr_value(ArkFr::from_be_bytes_mod_order(b)),
+            fr_value(ArkFr::from_le_bytes_mod_order(b)),
+            sep
+        );
+    }
+    println!("]");
+    println!();
+    println!("/-- (a, b, `add(a, b)`, `sub(a, b)`, `neg(a)`, `le(a, b)`, `eq(a, b)`) -/");
+    println!("def opVectors : List (Nat × Nat × Nat × Nat × Nat × Bool × Bool) := [");
+    let n = elems.len() * elems.len();
+    let mut k = 0;
+    for a in &elems {
+        for b in &elems {
+            k += 1;
+            let sep = if k == n { "" } else { "," };
+            let (fa, fb) = (fr(a), fr(b));
+            println!(
+                "  ({}, {}, {}, {}, {}, {}, {}){}",
+                a,
+                b,
+                fr_value(ArkFr::add(fa, fb)),
+                fr_value(ArkFr::sub(fa, fb)),
+                fr_value(ArkFr::neg(fa)),
+                ArkFr::le(fa, fb),
+                ArkFr::eq(fa, fb),
+                sep
+            );
+        }
     }
     println!("]");
     println!("-- END GENERATED");

@@ -1,7 +1,7 @@
 /// Arithmetic in the BN254 scalar field (`ark_bn254::Fr` in the program).
 ///
-/// The program implements this with arkworks; the Lean model treats the field
-/// as abstract, so every property the proofs rely on is an explicit assumption.
+/// The program implements this with arkworks; the Lean model defines it as the
+/// integers mod r, checked against arkworks by `tests/model_vectors.rs`.
 pub trait PrimeField: Copy {
     /// `x mod p`, like `Fr::from(x)`.
     fn from_u64(x: u64) -> Self;
