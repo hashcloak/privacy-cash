@@ -22,7 +22,7 @@ mod upstream {
     use super::*;
     use zkcash::groth16::Groth16Verifier;
 
-    // Verbatim from upstream `utils::verify_proof` (utils.rs:214-274).
+    // Verbatim from upstream `utils::verify_proof` (utils.rs:214-268).
     pub fn verify_proof(proof: Proof, verifying_key: Groth16Verifyingkey) -> bool {
         let mut public_inputs_vec: [[u8; 32]; 7] = [[0u8; 32]; 7];
 

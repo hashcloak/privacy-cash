@@ -40,6 +40,10 @@ pub struct Groth16Verifyingkey<'a> {
     pub vk_ic: &'a [[u8; 64]],
 }
 
+/// Upstream's verifier. The program no longer calls it (`utils::verify_proof`
+/// uses `zkcash_core::groth16`); it is kept unchanged because upstream's unit
+/// tests use it and the differential test (`tests/differential/groth16.rs`)
+/// uses it as the reference the core verifier is compared against.
 #[derive(PartialEq, Eq, Debug)]
 pub struct Groth16Verifier<'a, const NR_INPUTS: usize> {
     proof_a: &'a [u8; 64],

@@ -1,4 +1,4 @@
-//! Mirrors the state changes of the admin instructions in lib.rs:
+//! Moved from upstream: the state changes of the admin instructions in lib.rs:
 //! `initialize`, `update_deposit_limit`, `update_global_config`,
 //! `initialize_tree_account_for_spl_token` and
 //! `update_deposit_limit_for_spl_token`.

@@ -1,4 +1,4 @@
-//! Mirrors the `transact` instruction (SOL deposits and withdrawals).
+//! The `transact` instruction (SOL deposits and withdrawals), moved from upstream.
 //!
 //! Everything the instruction decides happens here. What needs the Solana
 //! runtime (reading and writing lamports, the system-program transfer CPI, the
@@ -82,7 +82,7 @@ fn program_err<T>(e: ErrorCode) -> Result<T, Error> {
     Err(Error::Program(e))
 }
 
-/// Mirrors the body of `transact` after the accounts are loaded.
+/// Moved from upstream: the body of `transact` after the accounts are loaded.
 #[allow(clippy::too_many_arguments)]
 pub fn transact<H: Hasher, F: PrimeField, S: Sha256, V: ProofVerifier, R: SolRuntime>(
     runtime: &mut R,

@@ -1,4 +1,4 @@
-//! Adapters between the program's Anchor account types and the verified
+//! Adapters between the program's Anchor account types and the extracted
 //! `zkcash_core::admin` functions. The instruction handlers in lib.rs call
 //! these; the differential tests call them too.
 

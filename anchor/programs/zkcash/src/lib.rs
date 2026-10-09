@@ -822,7 +822,7 @@ impl From<zkcash_core::error::ErrorCode> for ErrorCode {
 }
 
 impl MerkleTreeAccount {
-    /// Zero-cost view of this account as the verified `zkcash_core` type.
+    /// Zero-cost view of this account as the extracted `zkcash_core` type.
     pub fn as_core(&self) -> &zkcash_core::merkle_tree::MerkleTreeAccount {
         bytemuck::cast_ref(self)
     }

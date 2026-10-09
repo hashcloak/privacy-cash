@@ -1,7 +1,7 @@
 [package]
 name = "zkcash_core"
 version = "0.1.0"
-description = "Anchor-free core logic of the zkcash program (formally verified with Aeneas)"
+description = "Anchor-free core logic of the zkcash program (extracted to Lean with Aeneas for formal verification)"
 edition = "2021"
 
 [features]

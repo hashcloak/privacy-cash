@@ -1,5 +1,5 @@
 //! Differential test of `transact`: the upstream handler body against the
-//! verified core, on a mock Solana runtime.
+//! extracted core, on a mock Solana runtime.
 //!
 //! scripts/e2e.sh runs upstream's integration suites against the real programs,
 //! but their negative tests accept any failure ("Transaction simulation

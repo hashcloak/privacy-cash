@@ -1,7 +1,7 @@
- //! Anchor-free core logic of the zkcash program.
+//! Anchor-free core logic of the zkcash program.
 //!
-//! Everything in this crate is extracted to Lean with Charon/Aeneas and
-//! formally verified, so it must stay free of Anchor, Solana syscalls and
+//! Everything in this crate is extracted to Lean with Charon/Aeneas (the code
+//! model the proofs are about), so it must stay free of Anchor, syscalls and
 //! features Aeneas does not support (interior mutability, raw pointers, `dyn`).
 #![no_std]
 extern crate alloc;

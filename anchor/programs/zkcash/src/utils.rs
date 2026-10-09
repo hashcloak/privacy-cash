@@ -15,7 +15,7 @@ type G1 = ark_bn254::g1::G1Affine;
 pub const SOL_ADDRESS: Pubkey = anchor_lang::pubkey!("11111111111111111111111111111112");
 
 /// The program's verifying key, in the upstream type. The bytes are defined
-/// once, in `zkcash_core::verifying_key`, so the verified model and the
+/// once, in `zkcash_core::verifying_key`, so the extracted model and the
 /// program cannot disagree on them.
 pub const VERIFYING_KEY: Groth16Verifyingkey = Groth16Verifyingkey {
 	nr_pubinputs: zkcash_core::groth16::NR_PUBLIC_INPUTS,
@@ -221,14 +221,11 @@ impl zkcash_core::ext_data::Sha256 for SolanaSha256 {
     }
 }
 
+/// Reverses the bytes of every 32-byte chunk. The body was moved to
+/// `zkcash_core::utils::change_endianness`; checked against upstream in
+/// `tests/differential/byte_helpers.rs`.
 pub fn change_endianness(bytes: &[u8]) -> Vec<u8> {
-    let mut vec = Vec::new();
-    for b in bytes.chunks(32) {
-        for byte in b.iter().rev() {
-            vec.push(*byte);
-        }
-    }
-    vec
+    zkcash_core::utils::change_endianness(bytes)
 }
 
 #[cfg(test)]

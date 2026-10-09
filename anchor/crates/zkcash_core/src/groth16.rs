@@ -1,4 +1,4 @@
-//! Mirrors the Groth16 verifier: `utils::verify_proof` and
+//! The Groth16 verifier, moved from upstream `utils::verify_proof` and
 //! `groth16::Groth16Verifier` (with 7 public inputs, as the program uses it).
 //!
 //! The elliptic-curve work is a boundary: the `alt_bn128` add / scalar
@@ -58,7 +58,7 @@ fn copy_into<const N: usize>(out: &mut [u8; 768], at: usize, bytes: &[u8; N]) {
     }
 }
 
-/// Mirrors `Groth16Verifier::prepare_inputs::<true>`: vk_ic[0] + sum of
+/// Upstream `Groth16Verifier::prepare_inputs::<true>`: vk_ic[0] + sum of
 /// input_i * vk_ic[i + 1], rejecting inputs that are not below the field size.
 fn prepare_inputs<C: Bn254>(
     public_inputs: &[[u8; 32]; NR_PUBLIC_INPUTS],
@@ -86,7 +86,7 @@ fn prepare_inputs<C: Bn254>(
     Ok(prepared_public_inputs)
 }
 
-/// Mirrors `Groth16Verifier::new(..)` followed by `verify()`, for 7 public inputs.
+/// Upstream `Groth16Verifier::new(..)` followed by `verify()`, for 7 public inputs.
 /// (`new`'s length checks always pass for these fixed-size arrays.)
 pub fn verify<C: Bn254>(
     proof_a: &[u8; 64],
@@ -122,7 +122,7 @@ pub fn verify<C: Bn254>(
     Ok(true)
 }
 
-/// Mirrors `utils::verify_proof`: the proof's public inputs in circuit order,
+/// Upstream `utils::verify_proof`: the proof's public inputs in circuit order,
 /// proof_a negated, then `verify`. Any failure means "not verified".
 pub fn verify_proof<C: Bn254>(proof: &Proof, verifying_key: &VerifyingKey) -> bool {
     let public_inputs_vec: [[u8; 32]; NR_PUBLIC_INPUTS] = [

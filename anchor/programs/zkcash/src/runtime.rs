@@ -1,4 +1,4 @@
-//! The Solana side of the verified `zkcash_core::transact`: its `SolRuntime`
+//! The Solana side of the extracted `zkcash_core::transact`: its `SolRuntime`
 //! (lamports, the system-program transfer CPI, the `Rent` sysvar) and
 //! `ProofVerifier` (Groth16) implementations, and error conversion.
 

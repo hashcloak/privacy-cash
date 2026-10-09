@@ -1,4 +1,4 @@
-//! Mirrors `utils::calculate_complete_ext_data_hash`.
+//! Moved from upstream `utils::calculate_complete_ext_data_hash`.
 //!
 //! Upstream builds a `#[derive(AnchorSerialize)]` struct and serializes it with
 //! Borsh; Borsh cannot be extracted, so this writes the same bytes explicitly.
@@ -73,7 +73,7 @@ pub fn serialize_complete_ext_data(
     Some(out)
 }
 
-/// Mirrors `utils::calculate_complete_ext_data_hash`: SHA-256 of the
+/// Upstream `utils::calculate_complete_ext_data_hash`: SHA-256 of the
 /// serialization. `None` exactly when upstream's `serialize(..)?` fails.
 pub fn calculate_complete_ext_data_hash<S: Sha256>(
     recipient: [u8; 32],

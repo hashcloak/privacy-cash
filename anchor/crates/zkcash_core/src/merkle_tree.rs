@@ -67,7 +67,7 @@ pub trait Hasher {
     fn zero_bytes() -> [[u8; 32]; ZERO_BYTES_LEN];
 }
 
-/// Mirrors `MerkleTree::initialize`.
+/// Moved from upstream `MerkleTree::initialize`.
 pub fn initialize<H: Hasher>(tree_account: &mut MerkleTreeAccount) -> Result<()> {
     let height = tree_account.height as usize;
 
@@ -85,7 +85,7 @@ pub fn initialize<H: Hasher>(tree_account: &mut MerkleTreeAccount) -> Result<()>
     Ok(())
 }
 
-/// Mirrors `MerkleTree::append`.
+/// Moved from upstream `MerkleTree::append`.
 pub fn append<H: Hasher>(
     leaf: [u8; 32],
     tree_account: &mut MerkleTreeAccount,

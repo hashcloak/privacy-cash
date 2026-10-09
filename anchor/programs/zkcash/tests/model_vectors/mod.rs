@@ -5,15 +5,24 @@
 //! `formal-verification/core-model/Tests/`, whose `#guard`s check that the
 //! Lean model gives the same answers:
 //! - `print_negate_g1_vectors`: `SolanaBn254::negate_g1` (`Bn254Vectors.lean`);
-//! - `print_field_vectors`: `ArkFr` (`FieldVectors.lean`).
+//! - `print_field_vectors`: `ArkFr` (`FieldVectors.lean`);
+//! - `print_account_spaces`: the `space` of each `init` account
+//!   (`AccountSpaces.lean`).
 //! `formal-verification/core-model/scripts/check_vectors.sh` regenerates the
 //! files and fails if they changed.
+//!
+//! `zero_bytes_are_empty_subtree_roots` (a normal test) checks the model's
+//! `ZeroBytesConsistent` hypothesis on the program's real Poseidon.
 
 use ark_ff::PrimeField as _;
 use num_bigint::BigUint;
+use light_hasher::Poseidon;
+use zkcash::merkle_tree::LightHasher;
 use zkcash::utils::{ArkFr, SolanaBn254, VERIFYING_KEY};
+use zkcash::{GlobalConfig, MerkleTreeAccount, NullifierAccount, TreeTokenAccount};
 use zkcash_core::field::PrimeField;
 use zkcash_core::groth16::Bn254;
+use zkcash_core::merkle_tree::{Hasher, ZERO_BYTES_LEN};
 
 /// Deterministic xorshift, so the vectors are the same on every run.
 struct Xorshift(u64);
@@ -247,6 +256,45 @@ fn print_field_vectors() {
                 sep
             );
         }
+    }
+    println!("]");
+    println!("-- END GENERATED");
+}
+
+/// The model's `ZeroBytesConsistent`: entry `i + 1` of the program's
+/// `zero_bytes` is the Poseidon hash of two copies of entry `i`, so each entry
+/// is the root of an empty subtree one level higher.
+#[test]
+fn zero_bytes_are_empty_subtree_roots() {
+    let z = <LightHasher<Poseidon> as Hasher>::zero_bytes();
+    for i in 0..ZERO_BYTES_LEN - 1 {
+        assert_eq!(
+            <LightHasher<Poseidon> as Hasher>::hash_pair(&z[i], &z[i]),
+            z[i + 1],
+            "zero_bytes[{}] is not hash(zero_bytes[{}], zero_bytes[{}])",
+            i + 1,
+            i,
+            i
+        );
+    }
+}
+
+#[test]
+#[ignore = "generator: run with --ignored --nocapture"]
+fn print_account_spaces() {
+    // `space = 8 + std::mem::size_of::<T>()` in lib.rs (8 = Anchor discriminator).
+    let spaces = [
+        ("MerkleTreeAccount", 8 + std::mem::size_of::<MerkleTreeAccount>()),
+        ("TreeTokenAccount", 8 + std::mem::size_of::<TreeTokenAccount>()),
+        ("GlobalConfig", 8 + std::mem::size_of::<GlobalConfig>()),
+        ("NullifierAccount", 8 + std::mem::size_of::<NullifierAccount>()),
+    ];
+    println!("-- BEGIN GENERATED");
+    println!("/-- (account type, `8 + size_of::<T>()`) -/");
+    println!("def accountSpaces : List (String × Nat) := [");
+    for (i, (name, space)) in spaces.iter().enumerate() {
+        let sep = if i + 1 == spaces.len() { "" } else { "," };
+        println!("  (\"{}\", {}){}", name, space, sep);
     }
     println!("]");
     println!("-- END GENERATED");
